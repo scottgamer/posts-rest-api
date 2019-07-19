@@ -5,9 +5,18 @@ const path = require('path');
 const Post = require('../models/post');
 
 exports.getPosts = (req, res, next) => {
+  const currentPage = req.query.page || 1;
+  const perPage = 2;
+  let totalItems;
   Post.find()
-    .then(posts => {
-      res.status(200).json(posts);
+    .countDocuments()
+    .then(count => {
+      totalItems = count;
+      return Post.find()
+        .skip((currentPage - 1) * perPage)
+        .limit(perPage);
+    }).then(posts => {
+      res.status(200).json({ posts, totalItems });
     })
     .catch(err => {
       if (!err.statusCode) {
@@ -15,6 +24,7 @@ exports.getPosts = (req, res, next) => {
       }
       next(err);
     });
+
 };
 
 exports.createPost = (req, res, next) => {
@@ -119,6 +129,32 @@ exports.updatePost = (req, res, next) => {
       }
       next(err);
     });
+}
+
+exports.deletePost = (req, res, next) => {
+  const postId = req.params.id;
+  Post.findById(postId)
+    .then(post => {
+      // TODO: check logged in user
+      if (!post) {
+        const error = new Error('Post not found!');
+        error.statusCode = 404;
+        throw error;
+      }
+      clearImage(post.imageUrl);
+      return Post.findByIdAndRemove(postId);
+    })
+    .then(result => {
+      console.log(result);
+      res.status(200).json({ message: 'Post has been deleted!' });
+    })
+    .catch(err => {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    });
+
 }
 
 const clearImage = filePath => {
